@@ -169,10 +169,10 @@ class MpFileExplorer(Pyboard):
 
         self.enter_raw_repl()
         self.exec_(
-            "try:\n    import uos\nexcept ImportError:\n    import os as uos\nimport sys"
+            "try:\n  import uos\nexcept ImportError:\n  import os as uos\nimport sys"
         )
         self.exec_(
-            "try:\n    import ubinascii\nexcept ImportError:\n    import binascii as ubinascii"
+            "try:\n  import ubinascii\nexcept ImportError:\n  import binascii as ubinascii"
         )
         self.exec_(
             "try:\n  import uhashlib\nexcept ImportError:\n  import hashlib as uhashlib\n  except ImportError:\n    pass"
