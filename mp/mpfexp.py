@@ -52,7 +52,7 @@ def _was_file_not_existing(exception):
     """
 
     stre = str(exception)
-    return any(err in stre for err in ("ENOENT", "ENODEV", "EINVAL", "OSError:"))
+    return any(err in stre for err in ("ENOENT", "ENODEV", "EINVAL"))
 
 
 class RemoteIOError(IOError):
@@ -149,6 +149,9 @@ class MpFileExplorer(Pyboard):
     def _fqn(self, name):
         return posixpath.join(self.dir, name)
 
+    def _parent(self, path: str):
+        return posixpath.dirname(path.rstrip())
+
     def __set_sysname(self):
         self.sysname = self.eval("uos.uname()[0]").decode("utf-8")
 
@@ -216,6 +219,39 @@ class MpFileExplorer(Pyboard):
             return sorted(files)
 
     @retry(PyboardError, tries=MAX_TRIES, delay=1, backoff=2, logger=logging.root)
+    def mkdir(self, target, parent=False, exist_ok=False):
+        ''' Make directory on target OS. Similar to pathlib.Path.mkdir
+
+        parent:
+        If parents is True, any missing parents in the path will be created as needed.
+        If parents is False (default), a missing parent raises RemoteIOError.
+
+        exist_ok:
+        If exist_ok is False (default), an error will be raised if the target directory already exists.
+        '''
+        try:
+            # try to make the directory
+            self.eval("uos.mkdir('%s')" % (self._fqn(target)))
+        except PyboardError as e:
+            if _was_file_not_existing(e):
+                if parent:
+                    # try to create the parent recursively
+                    self.mkdir(self._parent(self._fqn(target)))
+                    # raise NotImplementedError("Creating intermediate directories is not supported.")
+                else:
+                    raise RemoteIOError("No such file or directory: %s" % target)
+            elif "OSError: 20" in str(e):
+                raise RemoteIOError(f"Not a directory: {target}")
+            elif "EEXIST" in str(e):
+                if not exist_ok:
+                    raise RemoteIOError("Directory already exists: %s" % target)
+            else:
+                raise e
+
+    def md(self, target):
+        self.mkdir(target)
+
+    @retry(PyboardError, tries=MAX_TRIES, delay=1, backoff=2, logger=logging.root)
     def rm(self, target):
 
         try:
@@ -279,7 +315,7 @@ class MpFileExplorer(Pyboard):
         except PyboardError as e:
             if _was_file_not_existing(e):
                 raise RemoteIOError("Failed to create file: %s" % dst)
-            elif "EACCES" in str(e):
+            elif "EACCES" in str(e) or "EISDIR" in str(e):
                 raise RemoteIOError("Existing directory: %s" % dst)
             else:
                 raise e
@@ -535,7 +571,7 @@ class MpFileExplorerCaching(MpFileExplorer):
             if not (dst, "F") in hit:
                 self.__cache(parent, hit + [(newitm, "F")])
 
-    def md(self, dir):
+    def mkdir(self, dir):
 
         MpFileExplorer.md(self, dir)
 
