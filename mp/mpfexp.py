@@ -171,6 +171,9 @@ class MpFileExplorer(Pyboard):
         self.exec_(
             "try:\n    import ubinascii\nexcept ImportError:\n    import binascii as ubinascii"
         )
+        self.exec_(
+            "try:\n  import uhashlib\nexcept ImportError:\n  import hashlib as uhashlib\n  except ImportError:\n    pass"
+        )
 
         # New version mounts files on /flash so lets set dir based on where we are in
         # filesystem.
@@ -437,23 +440,24 @@ class MpFileExplorer(Pyboard):
             else:
                 raise e
 
-    def pwd(self):
-        return self.dir
-
     @retry(PyboardError, tries=MAX_TRIES, delay=1, backoff=2, logger=logging.root)
-    def md(self, target):
-
+    def sha256(self, target):
+        cmd = f"with open('{self._fqn(target)}', 'rb') as f:\n  print(ubinascii.hexlify(hashlib.sha256(f.read()).digest()))"
         try:
-
-            self.eval("uos.mkdir('%s')" % self._fqn(target))
-
+            result = self.exec_(cmd).strip().decode('utf-8')
         except PyboardError as e:
             if _was_file_not_existing(e):
-                raise RemoteIOError("Invalid directory name: %s" % target)
-            elif "EEXIST" in str(e):
-                raise RemoteIOError("File or directory exists: %s" % target)
+                raise RemoteIOError(f"No such file: {target}")
+            elif 'NameError' in str(e):
+                raise RemoteIOError(f"Remote device does not have hashlib installed.")
+            elif "EACCES" in str(e) or "EISDIR" in str(e):
+                raise RemoteIOError(f"Target was actually directory: {target}")
             else:
                 raise e
+        return ast.literal_eval(result).decode('utf-8')
+
+    def pwd(self):
+        return self.dir
 
     def mpy_cross(self, src, dst=None):
 
