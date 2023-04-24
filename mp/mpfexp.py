@@ -272,7 +272,7 @@ class MpFileExplorer(Pyboard):
                     break
 
                 self.exec_("f.write(ubinascii.unhexlify('%s'))" % c.decode("utf-8"))
-                data = data[self.BIN_CHUNK_SIZE :]
+                data = data[self.BIN_CHUNK_SIZE:]
 
             self.exec_("f.close()")
 
@@ -330,9 +330,10 @@ class MpFileExplorer(Pyboard):
                 raise RemoteIOError("Failed to read file: %s" % src)
             else:
                 raise e
-
-        f.write(binascii.unhexlify(ret))
-        f.close()
+        else:
+            f.write(binascii.unhexlify(ret))
+        finally:
+            f.close()
 
     def mget(self, dst_dir, pat, verbose=False):
 
@@ -403,7 +404,7 @@ class MpFileExplorer(Pyboard):
                     break
 
                 self.exec_("f.write(ubinascii.unhexlify('%s'))" % c.decode("utf-8"))
-                data = data[self.BIN_CHUNK_SIZE :]
+                data = data[self.BIN_CHUNK_SIZE:]
 
             self.exec_("f.close()")
 
